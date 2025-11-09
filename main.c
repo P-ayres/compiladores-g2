@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-// Declarações externas (vindas do parser e lexer)
 extern int yyparse(void);
 extern FILE *yyin;
 extern FILE *yyout;
