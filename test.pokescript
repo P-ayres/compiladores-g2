@@ -1,0 +1,10 @@
+trainer ash() {
+    pokeball pikachu = 100;
+    shout("Olá, mundo!");
+    battle (pikachu > 50) {
+        shout("Vamos ganhar!");
+    } else {
+        shout("Que pena...");
+    }
+    evolve pikachu;
+}
