@@ -1,9 +1,13 @@
 all: tradutor
 
-tradutor: lexer.l parser.y main.c
-	bison -d parser.y
-	flex lexer.l
-	gcc parser.tab.c lex.yy.c main.c -o tradutor
+tradutor: lex.yy.c parser.tab.c main.c
+	@gcc parser.tab.c lex.yy.c main.c -o tradutor -lfl
+
+parser.tab.c parser.tab.h: parser.y
+	@bison -d parser.y
+
+lex.yy.c: lexer.l parser.tab.h
+	@flex lexer.l
 
 clean:
-	rm -f tradutor lex.yy.c parser.tab.c parser.tab.h
+	@rm -f tradutor lex.yy.c parser.tab.c parser.tab.h
