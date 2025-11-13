@@ -20,11 +20,14 @@ void yyerror(const char* s){ fprintf(stderr,"[syntax] %s\n", s); }
 %}
 
 /* ===== Tipos de valor semântico ===== */
-%union { char* str; }
+%union {
+  char* str;
+  int num;
+  }
 
 /* ===== Tokens vindos do lexer.l ===== */
 %token TRAINER POKEBALL BATTLE ELSE TALLGRASS JOURNEY SHOUT EVOLVE TRUE FALSE
-%token IDENT NUMBER STRING
+%token <str> IDENT NUMBER STRING
 %token EQ NE LE GE AND OR
 
 /* ===== Tipos associados às regras ===== */

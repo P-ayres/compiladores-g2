@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include "parser.tab.h"   /* tokens do Bison */
 extern YYSTYPE yylval;
+extern FILE *yyout;
 
 /* Util p/ strings (se quiser usar em debug) */
 static char* xstrdup(const char* s){
@@ -21,6 +22,7 @@ static char* xstrdup(const char* s){
 WS        [ \t\r\n]+
 ID        [A-Za-z_][A-Za-z0-9_]*
 NUM       ([0-9]+\.[0-9]+|[0-9]+)
+%x COMMENT
 /* strings com escapes em C: "..." */
 STR       \"([^\"\\]|\\.)*\"
 
@@ -28,11 +30,14 @@ STR       \"([^\"\\]|\\.)*\"
 %%
 {WS}                  ;                       /* ignora espaço/branco */
 
-/* Comentários: // linha, e /* bloco (aninhamento simples) */
-"//".*                ;
-"/*"([^*]|\*+[^*/])*"*"+"/" ;
 
-/* Palavras-chave tema Pokémon */
+"//".*                ;
+"/*"                  { BEGIN(COMMENT); }
+<COMMENT>{
+    "*/"              { BEGIN(INITIAL); }
+    .|\n             ;                 
+}
+
 "trainer"             { return TRAINER; }
 "pokeball"            { return POKEBALL; }
 "battle"              { return BATTLE; }
@@ -44,7 +49,7 @@ STR       \"([^\"\\]|\\.)*\"
 "true"                { return TRUE; }
 "false"               { return FALSE; }
 
-/* Operadores compostos */
+
 "=="                  { return EQ; }
 "!="                  { return NE; }
 "<="                  { return LE; }
@@ -52,7 +57,7 @@ STR       \"([^\"\\]|\\.)*\"
 "&&"                  { return AND; }
 "||"                  { return OR;  }
 
-/* Símbolos de 1 char (Bison usa o próprio char como token) */
+
 "="                   { return '='; }
 "<"                   { return '<'; }
 ">"                   { return '>'; }
@@ -69,7 +74,7 @@ STR       \"([^\"\\]|\\.)*\"
 "{"                   { return '{'; }
 "}"                   { return '}'; }
 
-/* Literais */
+
 {STR}                 { yylval.str = xstrdup(yytext); return STRING; }
 {NUM}                 { yylval.str = xstrdup(yytext); return NUMBER; }
 {ID}                  { yylval.str = xstrdup(yytext); return IDENT;  }

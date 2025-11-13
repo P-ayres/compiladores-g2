@@ -8,7 +8,7 @@ extern FILE *yyout;
 
 int main(int argc, char **argv) {
     if (argc < 3) {
-        fprintf(stderr, "Uso: %s input.pokescript output.js\n", argv[0]);
+        fprintf(stderr, "Uso: %s input.pokescript output.py\n", argv[0]);
         return 1;
     }
 
