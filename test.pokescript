@@ -1,10 +1,54 @@
-trainer ash() {
-    pokeball pikachu = 100;
-    shout("Olá, mundo!");
-    battle (pikachu > 50) {
-        shout("Vamos ganhar!");
+trainer calcDamage(base, multiplier) {
+    pokeball damage = base * multiplier;
+
+    battle (damage > 100) {
+        shout("Dano crítico!");
     } else {
-        shout("Que pena...");
+        shout("Dano normal.");
     }
-    evolve pikachu;
+
+    evolve damage;
+}
+
+trainer trainPokemon(name) {
+    pokeball xp = 0;
+
+    shout("Treinando " + name);
+
+    tallgrass (xp < 50) {
+        xp = xp + 10;
+        shout("XP atual: ");
+        shout(xp);
+    }
+
+    evolve xp;
+}
+
+trainer main() {
+    pokeball pikachu_hp = 100;
+    pokeball i = 0;
+
+    shout("Iniciando jornada do Pikachu!");
+
+    journey (pokeball battleCount = 0; battleCount < 3; battleCount = battleCount + 1) {
+        shout("Batalha número: ");
+        shout(battleCount);
+
+        battle (pikachu_hp > 0 && battleCount < 2) {
+            shout("Pikachu ainda está firme!");
+            pikachu_hp = pikachu_hp - 30;
+        } else {
+            shout("Pikachu está cansado...");
+        }
+    }
+
+    pokeball totalDamage = calcDamage(40, 3);
+    shout("Total de dano calculado:");
+    shout(totalDamage);
+
+    pokeball finalXp = trainPokemon("Pikachu");
+    shout("XP final do Pikachu:");
+    shout(finalXp);
+
+    evolve pikachu_hp;
 }
