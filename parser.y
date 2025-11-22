@@ -7,10 +7,36 @@
 extern FILE* yyout;
 
 /* ===== Helpers de string p/ “geração de código” ===== */
-static char* strclone(const char* s){ if(!s) return NULL; size_t n=strlen(s); char* r=(char*)malloc(n+1); memcpy(r,s,n+1); return r; }
-static char* cat2(const char* a,const char* b){ size_t na=a?strlen(a):0, nb=b?strlen(b):0; char* r=(char*)malloc(na+nb+1); if(a) memcpy(r,a,na); if(b) memcpy(r+na,b,nb); r[na+nb]='\0'; return r; }
-static char* cat3(const char* a,const char* b,const char* c){ char* t=cat2(a,b); char* r=cat2(t,c); free(t); return r; }
-static void append(char** base, const char* add){ char* t=cat2(*base?*base:"", add?add:""); if(*base) free(*base); *base=t; }
+static char* strclone(const char* s){
+    if(!s) return NULL;
+    size_t n = strlen(s);
+    char* r = (char*)malloc(n+1);
+    memcpy(r, s, n+1);
+    return r;
+}
+
+static char* cat2(const char* a,const char* b){
+    size_t na = a ? strlen(a) : 0;
+    size_t nb = b ? strlen(b) : 0;
+    char* r = (char*)malloc(na + nb + 1);
+    if(a) memcpy(r,     a,  na);
+    if(b) memcpy(r+na,  b,  nb);
+    r[na+nb] = '\0';
+    return r;
+}
+
+static char* cat3(const char* a,const char* b,const char* c){
+    char* t = cat2(a,b);
+    char* r = cat2(t,c);
+    free(t);
+    return r;
+}
+
+static void append(char** base, const char* add){
+    char* t = cat2(*base ? *base : "", add ? add : "");
+    if(*base) free(*base);
+    *base = t;
+}
 
 /* Indenta um bloco de código em 4 espaços por linha (para Python) */
 static char* indent_block(const char* s){
@@ -40,14 +66,19 @@ static char* indent_block(const char* s){
 static char* G_OUT = NULL;
 
 int yylex(void);
-void yyerror(const char* s){ fprintf(stderr,"[syntax] %s\n", s); }
+
+/* Mensagem de erro mais “profissional”, com número da linha */
+void yyerror(const char* s){
+    extern int yylineno;
+    fprintf(stderr,"[syntax] %s na linha %d\n", s, yylineno);
+}
 %}
 
 /* ===== Tipos de valor semântico ===== */
 %union {
   char* str;
   int num;
-  }
+}
 
 /* ===== Tokens vindos do lexer.l ===== */
 %token TRAINER POKEBALL BATTLE ELSE TALLGRASS JOURNEY SHOUT EVOLVE TRUE FALSE
@@ -72,10 +103,18 @@ void yyerror(const char* s){ fprintf(stderr,"[syntax] %s\n", s); }
 
 %%
 
-/* Ponto de entrada: grava o Python em yyout */
+/* Ponto de entrada: grava o Python em yyout e auto-executa main, se existir */
 program
   : items {
+      /* junta tudo gerado pelas regras */
       append(&G_OUT, $1);
+
+      /* se houver uma função def main(...), adiciona auto-execução em Python */
+      if (G_OUT && strstr(G_OUT, "def main(") != NULL) {
+          append(&G_OUT, "\n\nif __name__ == '__main__':\n");
+          append(&G_OUT, "    main()\n");
+      }
+
       if (!yyout) yyout = stdout;
       fprintf(yyout, "%s\n", G_OUT ? G_OUT : "");
       free(G_OUT); G_OUT = NULL;
