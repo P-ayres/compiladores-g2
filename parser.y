@@ -12,7 +12,31 @@ static char* cat2(const char* a,const char* b){ size_t na=a?strlen(a):0, nb=b?st
 static char* cat3(const char* a,const char* b,const char* c){ char* t=cat2(a,b); char* r=cat2(t,c); free(t); return r; }
 static void append(char** base, const char* add){ char* t=cat2(*base?*base:"", add?add:""); if(*base) free(*base); *base=t; }
 
-/* Acumulador do JS final */
+/* Indenta um bloco de código em 4 espaços por linha (para Python) */
+static char* indent_block(const char* s){
+    if(!s || !*s) return strclone("    pass\n"); /* bloco vazio → pass */
+
+    size_t n = strlen(s);
+    /* margem de segurança: até ~5x o tamanho original */
+    char* r = (char*)malloc(n * 5 + 8);
+    char* p = r;
+    const char* q = s;
+
+    /* primeira linha sempre começa indentada */
+    *p++ = ' '; *p++ = ' '; *p++ = ' '; *p++ = ' ';
+
+    for(; *q; ++q){
+        *p++ = *q;
+        if(*q == '\n' && *(q+1) != '\0'){
+            *p++ = ' '; *p++ = ' '; *p++ = ' '; *p++ = ' ';
+        }
+    }
+
+    *p = '\0';
+    return r;
+}
+
+/* Acumulador do Python final */
 static char* G_OUT = NULL;
 
 int yylex(void);
@@ -48,7 +72,7 @@ void yyerror(const char* s){ fprintf(stderr,"[syntax] %s\n", s); }
 
 %%
 
-/* Ponto de entrada: grava o JS em yyout */
+/* Ponto de entrada: grava o Python em yyout */
 program
   : items {
       append(&G_OUT, $1);
@@ -70,16 +94,24 @@ item
   | stmt                 { $$ = $1; }
   ;
 
-/* trainer nome(params) { ... } → function nome(params) {...} */
+/* trainer nome(params) { ... } → def nome(params): ... */
 func_decl
   : TRAINER IDENT '(' opt_param_list ')' block
       {
-        char* hdr  = cat3("function ", $2, "(");
-        char* hdr2 = cat3(hdr, $4 ? $4 : "", ")");
-        char* all  = cat2(hdr2, $6);
+        /* $6 é o corpo sem chaves */
+        char* body = indent_block($6);
+        char* hdr  = cat3("def ", $2, "(");
+        char* hdr2 = cat3(hdr, $4 ? $4 : "", "):\n");
+        char* all  = cat2(hdr2, body);
+
         $$ = all;
-        free(hdr); free(hdr2);
-        free($2); if($4) free($4); free($6);
+
+        free(hdr);
+        free(hdr2);
+        free(body);
+        free($2);
+        if($4) free($4);
+        if($6) free($6);
       }
   ;
 
@@ -93,80 +125,144 @@ param_list
   | param_list ',' IDENT { char* t = cat3($1, ", ", $3); free($1); free($3); $$ = t; }
   ;
 
-/* pokeball x = expr; → let x = expr; */
+/* pokeball x = expr; → x = expr */
 var_decl
   : POKEBALL IDENT '=' expr ';'
-      { char* t = cat3("let ", $2, " = "); char* u = cat3(t, $4, ";\n"); free(t); free($2); free($4); $$ = u; }
+      {
+        char* t = cat3($2, " = ", $4);
+        char* u = cat2(t, "\n");
+        free(t);
+        free($2);
+        free($4);
+        $$ = u;
+      }
   ;
 
-/* { items } | {} */
+/* { items } | {}  → em Python, só usamos o corpo */
 block
-  : '{' items '}'        { char* in = $2; char* t = cat3("{\n", in ? in : "", "}\n"); free(in); $$ = t; }
-  | '{' '}'              { $$ = strclone("{\n}\n"); }
+  : '{' items '}'        { $$ = $2; }
+  | '{' '}'              { $$ = NULL; }
   ;
 
 stmt
-  : print ';'            { char* t = cat2($1, ";\n"); free($1); $$ = t; }
+  : print ';'            { char* t = cat2($1, "\n"); free($1); $$ = t; }
   | if                   { $$ = $1; }
   | while                { $$ = $1; }
   | for                  { $$ = $1; }
-  | return ';'           { char* t = cat2($1, ";\n"); free($1); $$ = t; }
-  | expr ';'             { char* t = cat2($1, ";\n"); free($1); $$ = t; }
+  | return ';'           { char* t = cat2($1, "\n"); free($1); $$ = t; }
+  | expr ';'             { char* t = cat2($1, "\n"); free($1); $$ = t; }
   | block                { $$ = $1; }
   ;
 
-/* shout(expr) → console.log(expr) */
+/* shout(expr) → print(expr) */
 print
   : SHOUT '(' expr ')'
-      { char* t = cat3("console.log(", $3, ")"); free($3); $$ = t; }
+      { char* t = cat3("print(", $3, ")"); free($3); $$ = t; }
   ;
 
-/* battle (cond) {...} [else {...}] → if (cond) {...} else {...} */
+/* battle (cond) {...} [else {...}] → if cond: ... [else: ...] */
 if
   : BATTLE '(' expr ')' block opt_else
       {
-        char* t = cat3("if (", $3, ") ");
-        char* u = cat2(t, $5);
-        char* v = $6 ? cat2(u, $6) : u;
+        char* body = indent_block($5);
+        char* hdr  = cat3("if ", $3, ":\n");
+        char* u    = cat2(hdr, body);
+        char* v    = $6 ? cat2(u, $6) : u;
+
         $$ = v;
-        free(t); if($6) free(u);
-        free($3); free($5); if($6) free($6);
+
+        free(hdr);
+        free(body);
+        free($3);
+        if($5) free($5);
+        if($6){
+          free(u);
+          free($6);
+        }
       }
   ;
 
 opt_else
   : /* vazio */          { $$ = NULL; }
-  | ELSE block           { $$ = cat3(" else ", $2, ""); free($2); }
+  | ELSE block
+      {
+        char* body = indent_block($2);
+        char* hdr  = strclone("else:\n");
+        char* all  = cat2(hdr, body);
+        $$ = all;
+        free(hdr);
+        free(body);
+        if($2) free($2);
+      }
   ;
 
-/* tallgrass (cond) {...} → while (cond) {...} */
+/* tallgrass (cond) {...} → while cond: ... */
 while
   : TALLGRASS '(' expr ')' block
       {
-        char* t = cat3("while (", $3, ") ");
-        char* u = cat2(t, $5);
-        $$ = u; free(t); free($3); free($5);
+        char* body = indent_block($5);
+        char* hdr  = cat3("while ", $3, ":\n");
+        char* all  = cat2(hdr, body);
+        $$ = all;
+        free(hdr);
+        free(body);
+        free($3);
+        if($5) free($5);
       }
   ;
 
-/* journey (pokeball i = a; cond; inc) { ... } → for (let i=a; cond; inc) {...} */
+/* journey (init; cond; inc) { ... } →
+   init
+   while cond:
+       body
+       inc
+*/
 for
   : JOURNEY '(' for_init ';' expr ';' expr ')' block
       {
-        char* head  = cat3("for (", $3, "; ");
-        char* head2 = cat3(head, $5, "; ");
-        char* head3 = cat3(head2, $7, ") ");
-        char* all   = cat2(head3, $9);
+        /* init */
+        char* init_line = cat2($3, "\n");
+
+        /* corpo do bloco */
+        char* body      = indent_block($9);
+
+        /* incremento */
+        char* inc_line  = cat2($7, "\n");
+        char* inc_body  = indent_block(inc_line);
+
+        /* while header */
+        char* hdr       = cat3("while ", $5, ":\n");
+        char* loop      = cat2(hdr, body);
+        char* loop2     = cat2(loop, inc_body);
+
+        /* código final: init + loop */
+        char* all       = cat2(init_line, loop2);
         $$ = all;
-        free(head); free(head2); free(head3);
-        free($3); free($5); free($7); free($9);
+
+        free(init_line);
+        free(body);
+        free(inc_line);
+        free(inc_body);
+        free(hdr);
+        free(loop);
+        free(loop2);
+
+        free($3);
+        free($5);
+        free($7);
+        if($9) free($9);
       }
   ;
 
-/* for-init: pokeball i = expr → let i = expr  (sem ;) */
+/* for-init: pokeball i = expr → i = expr */
 for_init
   : POKEBALL IDENT '=' expr
-      { char* t = cat3("let ", $2, " = "); char* u = cat2(t, $4); free(t); free($2); free($4); $$ = u; }
+      {
+        char* t = cat3($2, " = ", $4);
+        free($2);
+        free($4);
+        $$ = t;
+      }
   ;
 
 /* evolve expr → return expr */
@@ -179,8 +275,8 @@ return
 expr
   : IDENT '=' expr       { char* t = cat3($1, " = ", $3); free($1); free($3); $$ = t; }
 
-  | expr OR expr         { char* t = cat3($1, " || ", $3); free($1); free($3); $$ = t; }
-  | expr AND expr        { char* t = cat3($1, " && ", $3); free($1); free($3); $$ = t; }
+  | expr OR expr         { char* t = cat3($1, " or ",  $3); free($1); free($3); $$ = t; }
+  | expr AND expr        { char* t = cat3($1, " and ", $3); free($1); free($3); $$ = t; }
   | expr EQ expr         { char* t = cat3($1, " == ", $3); free($1); free($3); $$ = t; }
   | expr NE expr         { char* t = cat3($1, " != ", $3); free($1); free($3); $$ = t; }
   | expr '<' expr        { char* t = cat3($1, " < ",  $3); free($1); free($3); $$ = t; }
@@ -194,7 +290,7 @@ expr
   | expr '%' expr        { char* t = cat3($1, " % ",  $3); free($1); free($3); $$ = t; }
 
   | '-' expr %prec UMINUS{ char* t = cat3("-", $2, ""); free($2); $$ = t; }
-  | '!' expr %prec NOT   { char* t = cat3("!", $2, ""); free($2); $$ = t; }
+  | '!' expr %prec NOT   { char* t = cat3("not ", $2, ""); free($2); $$ = t; }
 
   | call                 { $$ = $1; }
   | primary              { $$ = $1; }
@@ -205,7 +301,10 @@ call
       {
         char* t = cat3($1, "(", $3 ? $3 : "");
         char* u = cat3(t, ")", "");
-        $$ = u; free(t); free($1); if($3) free($3);
+        $$ = u;
+        free(t);
+        free($1);
+        if($3) free($3);
       }
   ;
 
@@ -222,8 +321,8 @@ arg_list
 primary
   : NUMBER               { $$ = $1; }              /* já vem como texto: 42 ou 3.14 */
   | STRING               { $$ = $1; }              /* já vem com aspas: "pikachu"   */
-  | TRUE                 { $$ = strclone("true"); }
-  | FALSE                { $$ = strclone("false"); }
+  | TRUE                 { $$ = strclone("True"); }
+  | FALSE                { $$ = strclone("False"); }
   | IDENT                { $$ = $1; }
   | '(' expr ')'         { char* t = cat3("(", $2, ")"); free($2); $$ = t; }
   ;

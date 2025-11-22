@@ -1,12 +1,8 @@
-function ash(){
-let pikachu = 100;
-console.log("Olá, mundo!");
-if (pikachu > 50) {
-console.log("Vamos ganhar!");
-}
- else {
-console.log("Que pena...");
-}
-return pikachu;
-}
-
+def ash():
+    pikachu = 100
+    print("Olá, mundo!")
+    if pikachu > 50:
+        print("Vamos ganhar!")
+    else:
+        print("Que pena...")
+    return pikachu
