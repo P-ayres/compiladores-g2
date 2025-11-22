@@ -77,18 +77,73 @@
 extern FILE* yyout;
 
 /* ===== Helpers de string p/ “geração de código” ===== */
-static char* strclone(const char* s){ if(!s) return NULL; size_t n=strlen(s); char* r=(char*)malloc(n+1); memcpy(r,s,n+1); return r; }
-static char* cat2(const char* a,const char* b){ size_t na=a?strlen(a):0, nb=b?strlen(b):0; char* r=(char*)malloc(na+nb+1); if(a) memcpy(r,a,na); if(b) memcpy(r+na,b,nb); r[na+nb]='\0'; return r; }
-static char* cat3(const char* a,const char* b,const char* c){ char* t=cat2(a,b); char* r=cat2(t,c); free(t); return r; }
-static void append(char** base, const char* add){ char* t=cat2(*base?*base:"", add?add:""); if(*base) free(*base); *base=t; }
+static char* strclone(const char* s){
+    if(!s) return NULL;
+    size_t n = strlen(s);
+    char* r = (char*)malloc(n+1);
+    memcpy(r, s, n+1);
+    return r;
+}
 
-/* Acumulador do JS final */
+static char* cat2(const char* a,const char* b){
+    size_t na = a ? strlen(a) : 0;
+    size_t nb = b ? strlen(b) : 0;
+    char* r = (char*)malloc(na + nb + 1);
+    if(a) memcpy(r,     a,  na);
+    if(b) memcpy(r+na,  b,  nb);
+    r[na+nb] = '\0';
+    return r;
+}
+
+static char* cat3(const char* a,const char* b,const char* c){
+    char* t = cat2(a,b);
+    char* r = cat2(t,c);
+    free(t);
+    return r;
+}
+
+static void append(char** base, const char* add){
+    char* t = cat2(*base ? *base : "", add ? add : "");
+    if(*base) free(*base);
+    *base = t;
+}
+
+/* Indenta um bloco de código em 4 espaços por linha (para Python) */
+static char* indent_block(const char* s){
+    if(!s || !*s) return strclone("    pass\n"); /* bloco vazio → pass */
+
+    size_t n = strlen(s);
+    /* margem de segurança: até ~5x o tamanho original */
+    char* r = (char*)malloc(n * 5 + 8);
+    char* p = r;
+    const char* q = s;
+
+    /* primeira linha sempre começa indentada */
+    *p++ = ' '; *p++ = ' '; *p++ = ' '; *p++ = ' ';
+
+    for(; *q; ++q){
+        *p++ = *q;
+        if(*q == '\n' && *(q+1) != '\0'){
+            *p++ = ' '; *p++ = ' '; *p++ = ' '; *p++ = ' ';
+        }
+    }
+
+    *p = '\0';
+    return r;
+}
+
+/* Acumulador do Python final */
 static char* G_OUT = NULL;
 
 int yylex(void);
-void yyerror(const char* s){ fprintf(stderr,"[syntax] %s\n", s); }
 
-#line 92 "parser.tab.c"
+/* Mensagem de erro mais “profissional”, com número da linha */
+void yyerror(const char* s){
+    extern int yylineno;
+    fprintf(stderr,"[syntax] %s na linha %d\n", s, yylineno);
+}
+
+#line 147 "parser.tab.c"
 
 # ifndef YY_CAST
 #  ifdef __cplusplus
@@ -562,14 +617,14 @@ static const yytype_int8 yytranslate[] =
 
 #if YYDEBUG
 /* YYRLINE[YYN] -- Source line where rule number YYN was defined.  */
-static const yytype_uint8 yyrline[] =
+static const yytype_int16 yyrline[] =
 {
-       0,    53,    53,    63,    64,    68,    69,    70,    75,    87,
-      88,    92,    93,    98,   104,   105,   109,   110,   111,   112,
-     113,   114,   115,   120,   126,   138,   139,   144,   154,   168,
-     174,   180,   182,   183,   184,   185,   186,   187,   188,   189,
-     190,   191,   192,   193,   194,   196,   197,   199,   200,   204,
-     213,   214,   218,   219,   223,   224,   225,   226,   227,   228
+       0,   108,   108,   126,   127,   131,   132,   133,   138,   158,
+     159,   163,   164,   169,   182,   183,   187,   188,   189,   190,
+     191,   192,   193,   198,   204,   225,   226,   240,   260,   298,
+     309,   315,   317,   318,   319,   320,   321,   322,   323,   324,
+     325,   326,   327,   328,   329,   331,   332,   334,   335,   339,
+     351,   352,   356,   357,   361,   362,   363,   364,   365,   366
 };
 #endif
 
@@ -1254,391 +1309,468 @@ yyreduce:
   switch (yyn)
     {
   case 2: /* program: items  */
-#line 53 "parser.y"
+#line 108 "parser.y"
           {
+      /* junta tudo gerado pelas regras */
       append(&G_OUT, (yyvsp[0].str));
+
+      /* se houver uma função def main(...), adiciona auto-execução em Python */
+      if (G_OUT && strstr(G_OUT, "def main(") != NULL) {
+          append(&G_OUT, "\n\nif __name__ == '__main__':\n");
+          append(&G_OUT, "    main()\n");
+      }
+
       if (!yyout) yyout = stdout;
       fprintf(yyout, "%s\n", G_OUT ? G_OUT : "");
       free(G_OUT); G_OUT = NULL;
       free((yyvsp[0].str));
     }
-#line 1266 "parser.tab.c"
+#line 1329 "parser.tab.c"
     break;
 
   case 3: /* items: items item  */
-#line 63 "parser.y"
+#line 126 "parser.y"
                          { (yyval.str) = cat2((yyvsp[-1].str), (yyvsp[0].str)); free((yyvsp[-1].str)); free((yyvsp[0].str)); }
-#line 1272 "parser.tab.c"
+#line 1335 "parser.tab.c"
     break;
 
   case 4: /* items: item  */
-#line 64 "parser.y"
+#line 127 "parser.y"
                          { (yyval.str) = (yyvsp[0].str); }
-#line 1278 "parser.tab.c"
+#line 1341 "parser.tab.c"
     break;
 
   case 5: /* item: func_decl  */
-#line 68 "parser.y"
+#line 131 "parser.y"
                          { (yyval.str) = (yyvsp[0].str); }
-#line 1284 "parser.tab.c"
+#line 1347 "parser.tab.c"
     break;
 
   case 6: /* item: var_decl  */
-#line 69 "parser.y"
+#line 132 "parser.y"
                          { (yyval.str) = (yyvsp[0].str); }
-#line 1290 "parser.tab.c"
+#line 1353 "parser.tab.c"
     break;
 
   case 7: /* item: stmt  */
-#line 70 "parser.y"
+#line 133 "parser.y"
                          { (yyval.str) = (yyvsp[0].str); }
-#line 1296 "parser.tab.c"
+#line 1359 "parser.tab.c"
     break;
 
   case 8: /* func_decl: TRAINER IDENT '(' opt_param_list ')' block  */
-#line 76 "parser.y"
+#line 139 "parser.y"
       {
-        char* hdr  = cat3("function ", (yyvsp[-4].str), "(");
-        char* hdr2 = cat3(hdr, (yyvsp[-2].str) ? (yyvsp[-2].str) : "", ")");
-        char* all  = cat2(hdr2, (yyvsp[0].str));
+        /* $6 é o corpo sem chaves */
+        char* body = indent_block((yyvsp[0].str));
+        char* hdr  = cat3("def ", (yyvsp[-4].str), "(");
+        char* hdr2 = cat3(hdr, (yyvsp[-2].str) ? (yyvsp[-2].str) : "", "):\n");
+        char* all  = cat2(hdr2, body);
+
         (yyval.str) = all;
-        free(hdr); free(hdr2);
-        free((yyvsp[-4].str)); if((yyvsp[-2].str)) free((yyvsp[-2].str)); free((yyvsp[0].str));
+
+        free(hdr);
+        free(hdr2);
+        free(body);
+        free((yyvsp[-4].str));
+        if((yyvsp[-2].str)) free((yyvsp[-2].str));
+        if((yyvsp[0].str)) free((yyvsp[0].str));
       }
-#line 1309 "parser.tab.c"
+#line 1380 "parser.tab.c"
     break;
 
   case 9: /* opt_param_list: %empty  */
-#line 87 "parser.y"
+#line 158 "parser.y"
                          { (yyval.str) = NULL; }
-#line 1315 "parser.tab.c"
+#line 1386 "parser.tab.c"
     break;
 
   case 10: /* opt_param_list: param_list  */
-#line 88 "parser.y"
+#line 159 "parser.y"
                          { (yyval.str) = (yyvsp[0].str); }
-#line 1321 "parser.tab.c"
+#line 1392 "parser.tab.c"
     break;
 
   case 11: /* param_list: IDENT  */
-#line 92 "parser.y"
+#line 163 "parser.y"
                          { (yyval.str) = (yyvsp[0].str); }
-#line 1327 "parser.tab.c"
+#line 1398 "parser.tab.c"
     break;
 
   case 12: /* param_list: param_list ',' IDENT  */
-#line 93 "parser.y"
+#line 164 "parser.y"
                          { char* t = cat3((yyvsp[-2].str), ", ", (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1333 "parser.tab.c"
+#line 1404 "parser.tab.c"
     break;
 
   case 13: /* var_decl: POKEBALL IDENT '=' expr ';'  */
-#line 99 "parser.y"
-      { char* t = cat3("let ", (yyvsp[-3].str), " = "); char* u = cat3(t, (yyvsp[-1].str), ";\n"); free(t); free((yyvsp[-3].str)); free((yyvsp[-1].str)); (yyval.str) = u; }
-#line 1339 "parser.tab.c"
+#line 170 "parser.y"
+      {
+        char* t = cat3((yyvsp[-3].str), " = ", (yyvsp[-1].str));
+        char* u = cat2(t, "\n");
+        free(t);
+        free((yyvsp[-3].str));
+        free((yyvsp[-1].str));
+        (yyval.str) = u;
+      }
+#line 1417 "parser.tab.c"
     break;
 
   case 14: /* block: '{' items '}'  */
-#line 104 "parser.y"
-                         { char* in = (yyvsp[-1].str); char* t = cat3("{\n", in ? in : "", "}\n"); free(in); (yyval.str) = t; }
-#line 1345 "parser.tab.c"
+#line 182 "parser.y"
+                         { (yyval.str) = (yyvsp[-1].str); }
+#line 1423 "parser.tab.c"
     break;
 
   case 15: /* block: '{' '}'  */
-#line 105 "parser.y"
-                         { (yyval.str) = strclone("{\n}\n"); }
-#line 1351 "parser.tab.c"
+#line 183 "parser.y"
+                         { (yyval.str) = NULL; }
+#line 1429 "parser.tab.c"
     break;
 
   case 16: /* stmt: print ';'  */
-#line 109 "parser.y"
-                         { char* t = cat2((yyvsp[-1].str), ";\n"); free((yyvsp[-1].str)); (yyval.str) = t; }
-#line 1357 "parser.tab.c"
+#line 187 "parser.y"
+                         { char* t = cat2((yyvsp[-1].str), "\n"); free((yyvsp[-1].str)); (yyval.str) = t; }
+#line 1435 "parser.tab.c"
     break;
 
   case 17: /* stmt: if  */
-#line 110 "parser.y"
+#line 188 "parser.y"
                          { (yyval.str) = (yyvsp[0].str); }
-#line 1363 "parser.tab.c"
+#line 1441 "parser.tab.c"
     break;
 
   case 18: /* stmt: while  */
-#line 111 "parser.y"
+#line 189 "parser.y"
                          { (yyval.str) = (yyvsp[0].str); }
-#line 1369 "parser.tab.c"
+#line 1447 "parser.tab.c"
     break;
 
   case 19: /* stmt: for  */
-#line 112 "parser.y"
+#line 190 "parser.y"
                          { (yyval.str) = (yyvsp[0].str); }
-#line 1375 "parser.tab.c"
+#line 1453 "parser.tab.c"
     break;
 
   case 20: /* stmt: return ';'  */
-#line 113 "parser.y"
-                         { char* t = cat2((yyvsp[-1].str), ";\n"); free((yyvsp[-1].str)); (yyval.str) = t; }
-#line 1381 "parser.tab.c"
+#line 191 "parser.y"
+                         { char* t = cat2((yyvsp[-1].str), "\n"); free((yyvsp[-1].str)); (yyval.str) = t; }
+#line 1459 "parser.tab.c"
     break;
 
   case 21: /* stmt: expr ';'  */
-#line 114 "parser.y"
-                         { char* t = cat2((yyvsp[-1].str), ";\n"); free((yyvsp[-1].str)); (yyval.str) = t; }
-#line 1387 "parser.tab.c"
+#line 192 "parser.y"
+                         { char* t = cat2((yyvsp[-1].str), "\n"); free((yyvsp[-1].str)); (yyval.str) = t; }
+#line 1465 "parser.tab.c"
     break;
 
   case 22: /* stmt: block  */
-#line 115 "parser.y"
+#line 193 "parser.y"
                          { (yyval.str) = (yyvsp[0].str); }
-#line 1393 "parser.tab.c"
+#line 1471 "parser.tab.c"
     break;
 
   case 23: /* print: SHOUT '(' expr ')'  */
-#line 121 "parser.y"
-      { char* t = cat3("console.log(", (yyvsp[-1].str), ")"); free((yyvsp[-1].str)); (yyval.str) = t; }
-#line 1399 "parser.tab.c"
+#line 199 "parser.y"
+      { char* t = cat3("print(", (yyvsp[-1].str), ")"); free((yyvsp[-1].str)); (yyval.str) = t; }
+#line 1477 "parser.tab.c"
     break;
 
   case 24: /* if: BATTLE '(' expr ')' block opt_else  */
-#line 127 "parser.y"
+#line 205 "parser.y"
       {
-        char* t = cat3("if (", (yyvsp[-3].str), ") ");
-        char* u = cat2(t, (yyvsp[-1].str));
-        char* v = (yyvsp[0].str) ? cat2(u, (yyvsp[0].str)) : u;
+        char* body = indent_block((yyvsp[-1].str));
+        char* hdr  = cat3("if ", (yyvsp[-3].str), ":\n");
+        char* u    = cat2(hdr, body);
+        char* v    = (yyvsp[0].str) ? cat2(u, (yyvsp[0].str)) : u;
+
         (yyval.str) = v;
-        free(t); if((yyvsp[0].str)) free(u);
-        free((yyvsp[-3].str)); free((yyvsp[-1].str)); if((yyvsp[0].str)) free((yyvsp[0].str));
+
+        free(hdr);
+        free(body);
+        free((yyvsp[-3].str));
+        if((yyvsp[-1].str)) free((yyvsp[-1].str));
+        if((yyvsp[0].str)){
+          free(u);
+          free((yyvsp[0].str));
+        }
       }
-#line 1412 "parser.tab.c"
+#line 1499 "parser.tab.c"
     break;
 
   case 25: /* opt_else: %empty  */
-#line 138 "parser.y"
+#line 225 "parser.y"
                          { (yyval.str) = NULL; }
-#line 1418 "parser.tab.c"
+#line 1505 "parser.tab.c"
     break;
 
   case 26: /* opt_else: ELSE block  */
-#line 139 "parser.y"
-                         { (yyval.str) = cat3(" else ", (yyvsp[0].str), ""); free((yyvsp[0].str)); }
-#line 1424 "parser.tab.c"
+#line 227 "parser.y"
+      {
+        char* body = indent_block((yyvsp[0].str));
+        char* hdr  = strclone("else:\n");
+        char* all  = cat2(hdr, body);
+        (yyval.str) = all;
+        free(hdr);
+        free(body);
+        if((yyvsp[0].str)) free((yyvsp[0].str));
+      }
+#line 1519 "parser.tab.c"
     break;
 
   case 27: /* while: TALLGRASS '(' expr ')' block  */
-#line 145 "parser.y"
+#line 241 "parser.y"
       {
-        char* t = cat3("while (", (yyvsp[-2].str), ") ");
-        char* u = cat2(t, (yyvsp[0].str));
-        (yyval.str) = u; free(t); free((yyvsp[-2].str)); free((yyvsp[0].str));
+        char* body = indent_block((yyvsp[0].str));
+        char* hdr  = cat3("while ", (yyvsp[-2].str), ":\n");
+        char* all  = cat2(hdr, body);
+        (yyval.str) = all;
+        free(hdr);
+        free(body);
+        free((yyvsp[-2].str));
+        if((yyvsp[0].str)) free((yyvsp[0].str));
       }
-#line 1434 "parser.tab.c"
+#line 1534 "parser.tab.c"
     break;
 
   case 28: /* for: JOURNEY '(' for_init ';' expr ';' expr ')' block  */
-#line 155 "parser.y"
+#line 261 "parser.y"
       {
-        char* head  = cat3("for (", (yyvsp[-6].str), "; ");
-        char* head2 = cat3(head, (yyvsp[-4].str), "; ");
-        char* head3 = cat3(head2, (yyvsp[-2].str), ") ");
-        char* all   = cat2(head3, (yyvsp[0].str));
+        /* init */
+        char* init_line = cat2((yyvsp[-6].str), "\n");
+
+        /* corpo do bloco */
+        char* body      = indent_block((yyvsp[0].str));
+
+        /* incremento */
+        char* inc_line  = cat2((yyvsp[-2].str), "\n");
+        char* inc_body  = indent_block(inc_line);
+
+        /* while header */
+        char* hdr       = cat3("while ", (yyvsp[-4].str), ":\n");
+        char* loop      = cat2(hdr, body);
+        char* loop2     = cat2(loop, inc_body);
+
+        /* código final: init + loop */
+        char* all       = cat2(init_line, loop2);
         (yyval.str) = all;
-        free(head); free(head2); free(head3);
-        free((yyvsp[-6].str)); free((yyvsp[-4].str)); free((yyvsp[-2].str)); free((yyvsp[0].str));
+
+        free(init_line);
+        free(body);
+        free(inc_line);
+        free(inc_body);
+        free(hdr);
+        free(loop);
+        free(loop2);
+
+        free((yyvsp[-6].str));
+        free((yyvsp[-4].str));
+        free((yyvsp[-2].str));
+        if((yyvsp[0].str)) free((yyvsp[0].str));
       }
-#line 1448 "parser.tab.c"
+#line 1572 "parser.tab.c"
     break;
 
   case 29: /* for_init: POKEBALL IDENT '=' expr  */
-#line 169 "parser.y"
-      { char* t = cat3("let ", (yyvsp[-2].str), " = "); char* u = cat2(t, (yyvsp[0].str)); free(t); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = u; }
-#line 1454 "parser.tab.c"
+#line 299 "parser.y"
+      {
+        char* t = cat3((yyvsp[-2].str), " = ", (yyvsp[0].str));
+        free((yyvsp[-2].str));
+        free((yyvsp[0].str));
+        (yyval.str) = t;
+      }
+#line 1583 "parser.tab.c"
     break;
 
   case 30: /* return: EVOLVE expr  */
-#line 175 "parser.y"
+#line 310 "parser.y"
       { char* t = cat3("return ", (yyvsp[0].str), ""); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1460 "parser.tab.c"
+#line 1589 "parser.tab.c"
     break;
 
   case 31: /* expr: IDENT '=' expr  */
-#line 180 "parser.y"
+#line 315 "parser.y"
                          { char* t = cat3((yyvsp[-2].str), " = ", (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1466 "parser.tab.c"
+#line 1595 "parser.tab.c"
     break;
 
   case 32: /* expr: expr OR expr  */
-#line 182 "parser.y"
-                         { char* t = cat3((yyvsp[-2].str), " || ", (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1472 "parser.tab.c"
+#line 317 "parser.y"
+                         { char* t = cat3((yyvsp[-2].str), " or ",  (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
+#line 1601 "parser.tab.c"
     break;
 
   case 33: /* expr: expr AND expr  */
-#line 183 "parser.y"
-                         { char* t = cat3((yyvsp[-2].str), " && ", (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1478 "parser.tab.c"
+#line 318 "parser.y"
+                         { char* t = cat3((yyvsp[-2].str), " and ", (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
+#line 1607 "parser.tab.c"
     break;
 
   case 34: /* expr: expr EQ expr  */
-#line 184 "parser.y"
+#line 319 "parser.y"
                          { char* t = cat3((yyvsp[-2].str), " == ", (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1484 "parser.tab.c"
+#line 1613 "parser.tab.c"
     break;
 
   case 35: /* expr: expr NE expr  */
-#line 185 "parser.y"
+#line 320 "parser.y"
                          { char* t = cat3((yyvsp[-2].str), " != ", (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1490 "parser.tab.c"
+#line 1619 "parser.tab.c"
     break;
 
   case 36: /* expr: expr '<' expr  */
-#line 186 "parser.y"
+#line 321 "parser.y"
                          { char* t = cat3((yyvsp[-2].str), " < ",  (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1496 "parser.tab.c"
+#line 1625 "parser.tab.c"
     break;
 
   case 37: /* expr: expr '>' expr  */
-#line 187 "parser.y"
+#line 322 "parser.y"
                          { char* t = cat3((yyvsp[-2].str), " > ",  (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1502 "parser.tab.c"
+#line 1631 "parser.tab.c"
     break;
 
   case 38: /* expr: expr LE expr  */
-#line 188 "parser.y"
+#line 323 "parser.y"
                          { char* t = cat3((yyvsp[-2].str), " <= ", (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1508 "parser.tab.c"
+#line 1637 "parser.tab.c"
     break;
 
   case 39: /* expr: expr GE expr  */
-#line 189 "parser.y"
+#line 324 "parser.y"
                          { char* t = cat3((yyvsp[-2].str), " >= ", (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1514 "parser.tab.c"
+#line 1643 "parser.tab.c"
     break;
 
   case 40: /* expr: expr '+' expr  */
-#line 190 "parser.y"
+#line 325 "parser.y"
                          { char* t = cat3((yyvsp[-2].str), " + ",  (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1520 "parser.tab.c"
+#line 1649 "parser.tab.c"
     break;
 
   case 41: /* expr: expr '-' expr  */
-#line 191 "parser.y"
+#line 326 "parser.y"
                          { char* t = cat3((yyvsp[-2].str), " - ",  (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1526 "parser.tab.c"
+#line 1655 "parser.tab.c"
     break;
 
   case 42: /* expr: expr '*' expr  */
-#line 192 "parser.y"
+#line 327 "parser.y"
                          { char* t = cat3((yyvsp[-2].str), " * ",  (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1532 "parser.tab.c"
+#line 1661 "parser.tab.c"
     break;
 
   case 43: /* expr: expr '/' expr  */
-#line 193 "parser.y"
+#line 328 "parser.y"
                          { char* t = cat3((yyvsp[-2].str), " / ",  (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1538 "parser.tab.c"
+#line 1667 "parser.tab.c"
     break;
 
   case 44: /* expr: expr '%' expr  */
-#line 194 "parser.y"
+#line 329 "parser.y"
                          { char* t = cat3((yyvsp[-2].str), " % ",  (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1544 "parser.tab.c"
+#line 1673 "parser.tab.c"
     break;
 
   case 45: /* expr: '-' expr  */
-#line 196 "parser.y"
+#line 331 "parser.y"
                          { char* t = cat3("-", (yyvsp[0].str), ""); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1550 "parser.tab.c"
+#line 1679 "parser.tab.c"
     break;
 
   case 46: /* expr: '!' expr  */
-#line 197 "parser.y"
-                         { char* t = cat3("!", (yyvsp[0].str), ""); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1556 "parser.tab.c"
+#line 332 "parser.y"
+                         { char* t = cat3("not ", (yyvsp[0].str), ""); free((yyvsp[0].str)); (yyval.str) = t; }
+#line 1685 "parser.tab.c"
     break;
 
   case 47: /* expr: call  */
-#line 199 "parser.y"
+#line 334 "parser.y"
                          { (yyval.str) = (yyvsp[0].str); }
-#line 1562 "parser.tab.c"
+#line 1691 "parser.tab.c"
     break;
 
   case 48: /* expr: primary  */
-#line 200 "parser.y"
+#line 335 "parser.y"
                          { (yyval.str) = (yyvsp[0].str); }
-#line 1568 "parser.tab.c"
+#line 1697 "parser.tab.c"
     break;
 
   case 49: /* call: IDENT '(' opt_arg_list ')'  */
-#line 205 "parser.y"
+#line 340 "parser.y"
       {
         char* t = cat3((yyvsp[-3].str), "(", (yyvsp[-1].str) ? (yyvsp[-1].str) : "");
         char* u = cat3(t, ")", "");
-        (yyval.str) = u; free(t); free((yyvsp[-3].str)); if((yyvsp[-1].str)) free((yyvsp[-1].str));
+        (yyval.str) = u;
+        free(t);
+        free((yyvsp[-3].str));
+        if((yyvsp[-1].str)) free((yyvsp[-1].str));
       }
-#line 1578 "parser.tab.c"
+#line 1710 "parser.tab.c"
     break;
 
   case 50: /* opt_arg_list: %empty  */
-#line 213 "parser.y"
+#line 351 "parser.y"
                          { (yyval.str) = NULL; }
-#line 1584 "parser.tab.c"
+#line 1716 "parser.tab.c"
     break;
 
   case 51: /* opt_arg_list: arg_list  */
-#line 214 "parser.y"
+#line 352 "parser.y"
                          { (yyval.str) = (yyvsp[0].str); }
-#line 1590 "parser.tab.c"
+#line 1722 "parser.tab.c"
     break;
 
   case 52: /* arg_list: expr  */
-#line 218 "parser.y"
+#line 356 "parser.y"
                          { (yyval.str) = (yyvsp[0].str); }
-#line 1596 "parser.tab.c"
+#line 1728 "parser.tab.c"
     break;
 
   case 53: /* arg_list: arg_list ',' expr  */
-#line 219 "parser.y"
+#line 357 "parser.y"
                          { char* t = cat3((yyvsp[-2].str), ", ", (yyvsp[0].str)); free((yyvsp[-2].str)); free((yyvsp[0].str)); (yyval.str) = t; }
-#line 1602 "parser.tab.c"
+#line 1734 "parser.tab.c"
     break;
 
   case 54: /* primary: NUMBER  */
-#line 223 "parser.y"
+#line 361 "parser.y"
                          { (yyval.str) = (yyvsp[0].str); }
-#line 1608 "parser.tab.c"
+#line 1740 "parser.tab.c"
     break;
 
   case 55: /* primary: STRING  */
-#line 224 "parser.y"
+#line 362 "parser.y"
                          { (yyval.str) = (yyvsp[0].str); }
-#line 1614 "parser.tab.c"
+#line 1746 "parser.tab.c"
     break;
 
   case 56: /* primary: TRUE  */
-#line 225 "parser.y"
-                         { (yyval.str) = strclone("true"); }
-#line 1620 "parser.tab.c"
+#line 363 "parser.y"
+                         { (yyval.str) = strclone("True"); }
+#line 1752 "parser.tab.c"
     break;
 
   case 57: /* primary: FALSE  */
-#line 226 "parser.y"
-                         { (yyval.str) = strclone("false"); }
-#line 1626 "parser.tab.c"
+#line 364 "parser.y"
+                         { (yyval.str) = strclone("False"); }
+#line 1758 "parser.tab.c"
     break;
 
   case 58: /* primary: IDENT  */
-#line 227 "parser.y"
+#line 365 "parser.y"
                          { (yyval.str) = (yyvsp[0].str); }
-#line 1632 "parser.tab.c"
+#line 1764 "parser.tab.c"
     break;
 
   case 59: /* primary: '(' expr ')'  */
-#line 228 "parser.y"
+#line 366 "parser.y"
                          { char* t = cat3("(", (yyvsp[-1].str), ")"); free((yyvsp[-1].str)); (yyval.str) = t; }
-#line 1638 "parser.tab.c"
+#line 1770 "parser.tab.c"
     break;
 
 
-#line 1642 "parser.tab.c"
+#line 1774 "parser.tab.c"
 
       default: break;
     }
@@ -1831,5 +1963,5 @@ yyreturnlab:
   return yyresult;
 }
 
-#line 231 "parser.y"
+#line 369 "parser.y"
 

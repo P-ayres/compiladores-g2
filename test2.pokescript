@@ -1,0 +1,14 @@
+trainer somar(a, b) {
+    evolve a + b;
+}
+
+trainer mostrarResultado() {
+    pokeball total = somar(10, 20);
+    shout("Total calculado:");
+    shout(total);
+}
+
+trainer main() {
+    shout("Chamando função mostrarResultado...");
+    mostrarResultado();
+}
