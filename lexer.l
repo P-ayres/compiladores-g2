@@ -4,11 +4,10 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
-#include "parser.tab.h"   /* tokens do Bison */
+#include "parser.tab.h"   
 extern YYSTYPE yylval;
 extern FILE *yyout;
 
-/* Util p/ strings (se quiser usar em debug) */
 static char* xstrdup(const char* s){
     if(!s) return NULL;
     size_t n = strlen(s);
@@ -18,7 +17,6 @@ static char* xstrdup(const char* s){
 }
 %}
 
-/* ======= Padrões ======= */
 WS        [ \t\r\n]+
 ID        [A-Za-z_][A-Za-z0-9_]*
 NUM       ([0-9]+\.[0-9]+|[0-9]+)
@@ -28,7 +26,7 @@ STR       \"([^\"\\]|\\.)*\"
 
 /* ======= Regras ======= */
 %%
-{WS}                  ;                       /* ignora espaço/branco */
+{WS}                  ;
 
 
 "//".*                ;
